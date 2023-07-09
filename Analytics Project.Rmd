@@ -1,0 +1,250 @@
+---
+title: "Business Analytics Project"
+date: "2023-06-16"
+author: Nicolas Mela
+output: 
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: monochrome
+    code_folding: hide
+    number_sections: true
+    css: custom3.css
+    
+
+  
+---
+
+
+```{r echo=T, results = 'hide', error=FALSE, warning=FALSE, message=FALSE, include = FALSE}
+library(tidyverse)
+library(rmdformats)
+library(usmap)
+library(showtext)
+library(lemon)
+
+tornado <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-05-16/tornados.csv')
+
+```
+
+
+# Introduction
+
+In this Business Analytics Project, we will be analyzing a data-set provided by the NOAA's Storm Prediction Center. This data-set contains information on Tornado occurrences in the United States from the years 1950 - 2022. In this analysis, we'll be exploring the specific variables in the data-set and gather insights on this data that might provide benefit to businesses and organizations on storm mitigation.
+
+The data-set includes various variables pertaining to each tornado occurrence. In this project, the variables we will be analyzing are the dates, the states, the magnitude on the F-scale, property loss, and the number of injuries and fatalities that occurred. 
+
+An important note regarding the data was an important change in 2016 by the NOAA. Over 1800 tornado's that had an unknown F-scale rating, were modified with an estimated F-scale rating by the NOAA. For all tornadoes modified in the data, a new  field was added to the database, "fc", that is set to "TRUE" for any tornado with a prior unknown F-scale rating. Thus, making it easier to filter previously unknown ratings.
+
+
+# Exploratory Visual Analysis
+
+## What is the trend of tornado occurrences over time?
+```{r warning=FALSE, message = FALSE}
+tornado %>%
+  group_by(yr) %>%
+  count() %>%
+  ggplot(aes(yr, n)) +
+  geom_line(color = "#2471A3") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Year", y = "Number of Tornado Occurrences", 
+       title = "Tornado Occurrences Over Time",
+       subtitle = "1950 - 2022", caption = "Data: NOAA") +
+  scale_x_continuous(breaks = seq(1950, 2022, 5), expand = c(0, 0)) + 
+  #adjusting the axis breaks to be in intervals of 5, with all space being used
+  theme_minimal() +
+   theme(text = element_text(color = 'black'),
+        plot.title = element_text(size = 17, face = "bold"),
+        plot.subtitle = element_text(size = 12)) +
+  scale_y_continuous(labels = scales::comma)
+```
+
+
+The line plot represents the number of tornado occurrences over the time period of 1950 - 2022. From what is shown, there seems to be an increasing amount of tornado occurrences over the years. We see that the lowest amount of tornado occurrences recorded was in 1950, with a yearly total of around 200 tornadoes, and the highest amount in 2004, with a total of 1817 tornadoes. We can assume there wasn't the most accurate amount recorded in the mid 1900's, but even so, since the 1970s, there has been a steady increase in occurrences over the years. 
+
+## Which states deal with the highest frequency of tornadoes over time?
+
+```{r}
+ # Instances of tornadoes by state
+tornadoes_st <- tornado %>%
+  group_by(st) %>%
+  summarise(value = n()) %>%
+  arrange(desc(value)) %>%
+  rename(state = st)
+
+# Add color levels to data for plot
+tornadoes_st <- tornadoes_st %>%
+  mutate(color = case_when(value < 500 ~ "Less than 500",
+                           value <= 1000 ~ "501 - 1,000",
+                           value <= 2000 ~ "1,001 - 2,000",
+                           value <= 4000 ~ "2,001 - 4,000",
+                           value > 4000 ~ "More than 4,000",
+                           TRUE ~ "No Tornadoes"))
+
+# Arrange color levels
+tornadoes_st$color <- fct_relevel(tornadoes_st$color, c("More than 4,000",
+                                                        "2,001 - 4,000",
+                                                        "1,001 - 2,000",
+                                                        "501 - 1,000",
+                                                        "Less than 500"))
+
+# Plot the data
+plot_usmap(data = tornadoes_st, values = "color", labels = FALSE) +
+  scale_fill_manual(values = c( "Less than 500" = "#E1F5FE",
+                                "501 - 1,000" = "#03A9F4",
+                                "1,001 - 2,000"= "#1976D2",
+                                "2,001 - 4,000"= "#1A5276",
+                                "More than 4,000" = "#212F3C",
+                                "No Tornadoes" = "grey70")) + 
+  labs(title = "Number of Tornadoes by State", subtitle = "1950 - 2022", caption = "Data: NOAA", fill = "color") +
+  theme(plot.title = element_text(margin = margin(b = 20, t=15),
+                                  color = "black",
+                                  face = "bold",
+                                  size = 22,
+                                  hjust = 0.5),
+        plot.subtitle = element_text(
+                                     color = "black",
+                                     size = 15,
+                                     hjust = 0.5, 
+                                     vjust = 4),
+        legend.position = "right",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 8), 
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.x = element_blank()) 
+```
+
+
+The map represents the amount of tornadoes that occurred in each state throughout the time period. As seen, Texas, Oklahoma, and Kansas are the states that have the most frequency of tornadoes, with over 4,000 tornado occurrences since 1950. It's clear that states in the west tend to experience the least amount of tornadoes, while states in the Midwest experience the most.  
+
+## Are there specific months during the year when tornado activity is more prevalent?
+
+```{r}
+tornado %>%
+  group_by(mo) %>%
+  count() %>%
+  mutate(mo = recode(mo, '1' = "Jan", '2' = "Feb", '3' = "Mar", '4' = "Apr", '5' = "May", '6' = "Jun", '7' = "Jul", '8' = "Aug", '9' = "Sep", '10' = "Oct", '11' = "Nov", '12' = "Dec")) %>%
+  ggplot(aes(factor(mo, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")), n)) +
+  geom_col(fill = "#2471A3") +
+  labs(title = "Number of Tornadoes by Month",
+       subtitle = "1950 - 2022",
+       caption = "Data: NOAA",
+       x = "Month",
+       y = "Number of Tornadoes") +
+  theme_minimal() +
+  theme(text = element_text(color = 'black'),
+        plot.title = element_text(size = 17, face = "bold"),
+        plot.subtitle = element_text(size = 12)) +
+  scale_y_continuous(labels = scales::comma)
+```
+
+
+The bar graph represents the number of tornadoes that occurred during each month since 1950. As seen, April, May, June, and July have the highest amount of tornado activity in the year, with May having slightly over 15,000 total tornado occurrences since 1950. It is clear that Fall and Winter have the least tornado activity compared to the other seasons, with January having the least activity out of the year at just under 1,800 total tornadoes since 1950. 
+
+## Which regions in the U.S. have experienced more property loss from Tornadoes?
+
+```{r warning = FALSE}
+region <- tornado %>%
+  mutate(st = case_when(st %in% c("FL", "GA", "AL", "MS", "AR", "LA", "TN", "KY", "WV", "VA", "NC", "SC") ~ "Southeast",
+                        st %in% c("MD", "DE", "NJ", "PA", "NY", "CT", "MA", "NH", "VT", "ME") ~ "Northeast",
+                        st %in% c("TX", "OK", "NM", "AZ") ~ "Southwest",
+                        st %in% c("KS", "NE", "SD", "ND", "MO", "IA", "MN", "IL", "WI", "IN", "MI", "OH") ~ "Midwest",
+                        st %in% c("AK", "HI", "CO", "WY", "MT", "ID", "UT", "NV", "CA", "OR", "WA") ~ "West",
+  ))
+
+options(scipen = 999)
+region %>%
+  drop_na(loss) %>%
+  mutate(mag = factor(mag)) %>%
+  group_by(yr, st) %>%
+  filter(st != "") %>%
+  summarize(avg_loss = sum(loss), .groups = "drop") %>%
+  ggplot(aes(yr, avg_loss, fill = st)) + geom_col() + 
+  labs(title = "Total Property Loss by Region", x = "Year", y = "Average Loss", fill = "Region", subtitle = "1950 - 2022") + 
+  facet_rep_wrap(~st, repeat.tick.labels = TRUE) +
+  scale_y_continuous(labels = scales::dollar) + scale_x_continuous(breaks = c(1950,1960,1970,1980,1990,2000,2010,2020)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 17, face = "bold"),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+        )
+```
+
+
+This plot represents the property loss throughout the period in each region of the United States. The region with the most property loss over time is the in the Midwest. However, in 2011, the Southeast region had the most property loss in the year at over 6 million dollars.  
+
+## Which years have more fatalaties due to tornadoes? 
+
+```{r warning=FALSE}
+tornado %>%
+  group_by(yr) %>% 
+  summarise(total_fat = sum(fat)) %>%  #Summarized a new column to be total amount of fatalities, grouped by year
+ggplot(aes(yr , total_fat)) + geom_col(fill = "#2471A3", color = "black") + labs(x = "Year", y = "Total Fatalities", title = "Total Fatalaties per Year", subtitle = "1950 - 2022", caption = "Data: NOAA") + 
+  scale_x_continuous(breaks = seq(1950,2022, 5)) + scale_y_continuous(breaks = seq(0,500, 100)) +  #Adjusting the axis breaks
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold")
+  )
+
+```
+
+
+This graph shows the total amount of fatalities that occurred from tornadoes in each given year. From the graph, we see the greatest year, in 2011, had over 600 total fatalities, the highest amount since 1953, where there was over 500 total fatalities. We only see three other years where there was over 200 fatalities in the U.S., 1957, 1965, and 1974. After 1975, the total fatalities per year seemed to have dropped to an average of around 50, excluding the oultier year of 2011. 
+
+
+## What amount of tornadoes occurred at each magnitude level throughout the time period?
+
+```{r warning=FALSE}
+tornado %>%
+  ggplot(aes(mag)) + geom_bar(fill = "#2471A3", color = "black") +
+  labs(x = "Magnitude", y = "Count", title = "Amount of Tornadoes per F-Scale Magnitude", subtitle = "1950 - 2022", capiton = "Data: NOAA") +
+  theme_bw() + coord_flip() +  #Flipping axis' to better show graph 
+  theme(
+    plot.title = element_text(size = 17, face = "bold")
+  )
+```
+
+
+This visual shows the amount of tornadoes at each magnitude level throughout the time period. It is clear that there are more frequency of tornadoes at lower magnitude levels, with the most prevalent tornado magnitude level being at 0, with over 30,000 tornadoes recorded at this level. 
+
+
+## Is there a correlation between the width of a tornado and the length it travels?
+
+```{r warning=FALSE}
+tornado %>%
+  filter(yr == 2022) %>%  #Filtering the data to be only from 2022
+  ggplot(aes(wid, len)) +
+  geom_point(size = 3, alpha = 0.7, color = "#2471A3") +  #Adjusting size and transparency of scatter plot
+  labs(x = "Horzontal Width (Yds)", y = "Length (Mi)", title = "Size and Length Traveled Correlation", subtitle = "Based on 2022", caption = "Data: NOAA") +
+  theme(legend.position = "none") + theme_bw() +  #Adjusting theme by removing the legend
+  theme(
+    plot.title = element_text(size = 17, face = "bold")
+  ) 
+```
+
+
+The scatter plot above shows the correlation between the length traveled and horizontal width of tornadoes in 2022. There doesn't seem to be a major correlation between both, but rather shows that even as most tornadoes become larger in width, they do not tend to become travel more than 20 miles. However, in 4 tornadoes that were outliers in their length, being over 40 miles, they were all greater than 850 yards in width, with 2 being over 1500 yards. 
+
+
+# Conclusion
+
+## Notworthy Findings
+The data we analyzed shows many different findings on the relationships between variables in the data-set. One noteworthy finding that was surprising was the gradual increment of tornado occurrences from the mid 20th century to present day. During the span of these years, while there is a clear slow increase, it's interesting to see that there were many spikes of fluctuations and drops during this time period. Another finding that was unexpected was the correlation between the width and length of a tornado. Another interesting observation was the frequency of tornadoes that occur in different parts of the United States and during different parts of the year. From the data we've seen, it's evident the most prevalent occurrences of tornadoes are in the Midwest, specifically Texas, Oklahoma, and Kansas, and are most prevalent during Summer in the year. With this observation, it wasn't surprising to see the Midwest states to have the highest average property loss over the past 70 years from tornadoes. 
+
+## Limitations
+With the exploratory analysis we've conducted in this project, many more questions and observations unfold. For instance, have the states with the most property loss improved on housing infrastructure and mitigation strategies over time in hopes to reduce the impact of tornadoes? How were the tornado watches and warnings during the tornado's that caused many casualties and injuries in a given year? How effective has the NOAA been able to record tornado activity prior to the 21st century? Were they able to accurately record all, or is there crucial data that's missing that can give us more insights? Many of these questions would be great to answer, but unfortunately can't during this analysis due to limited data. 
+
+## Business Usage
+An organization can utilize all of this data on tornado occurrences to make informed decisions in many ways. Firstly, monitoring the trend of increasing tornado occurrences over time can emphasize the need for long-term investment in tornado damage planning capabilities. On top of this, with understanding the distribution of tornado magnitudes, and the tornado activity distributed throughout the states and within the year, organizations can focus on risk mitigation strategies in areas and time periods with more activity and severity. The insights between tornado width and length can also help organizations and governments to reform infrastructure planning, as they consider the potential impact of larger and longer tornadoes that occur. 
+
+
+
+
+
+
