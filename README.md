@@ -1,2 +1,2 @@
-# Exploratory Data Analysis on Tornado Occurrences in the U.S.
+# Exploratory Analysis on Tornado Activity in the U.S.
 
