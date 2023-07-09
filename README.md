@@ -1,4 +1,4 @@
-# Data Analytics Portfolio
+# Exploratory Data Analysis on Tornado Occurrences in the U.S.
 
 Nicolas Mela
 
